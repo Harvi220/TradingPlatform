@@ -1,17 +1,17 @@
-'use client';
+"use client";
 
 /**
  * Dashboard страница для отображения order book данных
  */
 
-import { useState } from 'react';
-import OrderBookTable from '@/components/orderbook/OrderBookTable';
+import { useState } from "react";
+import OrderBookTable from "@/components/orderbook/OrderBookTable";
 
 export default function DashboardPage() {
-  const [symbol, setSymbol] = useState('BTCUSDT');
-  const [marketType, setMarketType] = useState<'spot' | 'futures'>('spot');
+  const [symbol, setSymbol] = useState("BTCUSDT");
+  const [marketType, setMarketType] = useState<"spot" | "futures">("spot");
 
-  const symbols = ['BTCUSDT', 'ETHUSDT', 'BNBUSDT', 'SOLUSDT', 'XRPUSDT'];
+  const symbols = ["BTCUSDT", "ETHUSDT", "BNBUSDT", "SOLUSDT", "XRPUSDT"];
 
   return (
     <div className="min-h-screen bg-gray-50 p-8">
@@ -31,9 +31,9 @@ export default function DashboardPage() {
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             {/* Выбор символа */}
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
+              <h2 className="block text-sm font-medium text-gray-700 mb-2">
                 Торговая пара
-              </label>
+              </h2>
               <select
                 value={symbol}
                 onChange={(e) => setSymbol(e.target.value)}
@@ -54,21 +54,24 @@ export default function DashboardPage() {
               </label>
               <div className="flex gap-4">
                 <button
-                  onClick={() => setMarketType('spot')}
+                  type="button"
+                  onClick={() => setMarketType("spot")}
                   className={`flex-1 px-4 py-2 rounded-md font-medium transition-colors ${
-                    marketType === 'spot'
-                      ? 'bg-blue-600 text-white'
-                      : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
+                    marketType === "spot"
+                      ? "bg-blue-600 text-white"
+                      : "bg-gray-200 text-gray-700 hover:bg-gray-300"
                   }`}
                 >
                   SPOT
                 </button>
+
                 <button
-                  onClick={() => setMarketType('futures')}
+                  type="button"
+                  onClick={() => setMarketType("futures")}
                   className={`flex-1 px-4 py-2 rounded-md font-medium transition-colors ${
-                    marketType === 'futures'
-                      ? 'bg-blue-600 text-white'
-                      : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
+                    marketType === "futures"
+                      ? "bg-blue-600 text-white"
+                      : "bg-gray-200 text-gray-700 hover:bg-gray-300"
                   }`}
                 >
                   FUTURES
@@ -85,17 +88,6 @@ export default function DashboardPage() {
             symbol={symbol}
             refreshInterval={1000}
           />
-        </div>
-
-        {/* Информация */}
-        <div className="mt-8 bg-blue-50 border border-blue-200 rounded-lg p-4">
-          <h3 className="font-semibold text-blue-900 mb-2">Информация:</h3>
-          <ul className="text-sm text-blue-800 space-y-1">
-            <li>• Данные обновляются каждую секунду через WebSocket API Binance</li>
-            <li>• DIFF = BID - ASK (положительное значение = бычий тренд)</li>
-            <li>• Глубина показывает объем ордеров на расстоянии % от текущей цены</li>
-            <li>• SPOT - спотовый рынок, FUTURES - фьючерсный рынок</li>
-          </ul>
         </div>
       </div>
     </div>

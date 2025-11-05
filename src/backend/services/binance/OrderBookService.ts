@@ -209,4 +209,11 @@ export class OrderBookService {
 
     return (bestBid.price + bestAsk.price) / 2;
   }
+
+  /**
+   * Получить статус WebSocket соединения
+   */
+  public getWebSocketStatus(): string {
+    return this.wsService.getStatus();
+  }
 }

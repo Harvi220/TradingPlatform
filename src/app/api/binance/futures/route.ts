@@ -68,6 +68,7 @@ export async function GET(request: NextRequest) {
       asks: orderBook.asks.slice(0, 20), // Топ 20 asks
       depthVolumes,
       diffs,
+      wsStatus: service.getWebSocketStatus(), // Статус WebSocket соединения
     };
 
     return NextResponse.json(response);

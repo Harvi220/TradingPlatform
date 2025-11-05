@@ -1,10 +1,10 @@
-'use client';
+"use client";
 
 /**
  * Компонент таблицы для отображения order book данных
  */
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect } from "react";
 
 interface OrderBookData {
   type: string;
@@ -30,10 +30,11 @@ interface OrderBookData {
     askVolume: number;
     percentage: number;
   }>;
+  wsStatus: string;
 }
 
 interface OrderBookTableProps {
-  marketType: 'spot' | 'futures';
+  marketType: "spot" | "futures";
   symbol: string;
   refreshInterval?: number;
 }
@@ -51,7 +52,9 @@ export default function OrderBookTable({
   useEffect(() => {
     const fetchData = async () => {
       try {
-        const response = await fetch(`/api/binance/${marketType}?symbol=${symbol}`);
+        const response = await fetch(
+          `/api/binance/${marketType}?symbol=${symbol}`
+        );
 
         if (!response.ok) {
           throw new Error(`HTTP error! status: ${response.status}`);
@@ -68,7 +71,7 @@ export default function OrderBookTable({
         setError(null);
         setLoading(false);
       } catch (err) {
-        setError(err instanceof Error ? err.message : 'Unknown error');
+        setError(err instanceof Error ? err.message : "Unknown error");
         setLoading(false);
       }
     };
@@ -104,41 +107,89 @@ export default function OrderBookTable({
 
   const timeSinceUpdate = Math.floor((Date.now() - lastUpdate) / 1000);
 
+  // Определяем цвет и текст статуса
+  const getStatusDisplay = (status: string) => {
+    switch (status) {
+      case "connected":
+        return {
+          color: "bg-green-500",
+          text: "Подключено",
+          textColor: "text-green-700",
+        };
+      case "connecting":
+        return {
+          color: "bg-yellow-500",
+          text: "Подключение...",
+          textColor: "text-yellow-700",
+        };
+      case "disconnected":
+        return {
+          color: "bg-gray-500",
+          text: "Отключено",
+          textColor: "text-gray-700",
+        };
+      case "error":
+        return {
+          color: "bg-red-500",
+          text: "Ошибка",
+          textColor: "text-red-700",
+        };
+      default:
+        return {
+          color: "bg-gray-500",
+          text: "Неизвестно",
+          textColor: "text-gray-700",
+        };
+    }
+  };
+
+  const statusDisplay = getStatusDisplay(data.wsStatus);
+
   return (
     <div className="space-y-6">
       {/* Заголовок */}
       <div className="bg-blue-50 p-4 rounded-lg">
-        <h2 className="text-2xl font-bold mb-2">
-          {data.symbol} - {data.type}
-        </h2>
+        <div className="flex justify-between items-start mb-2">
+          <h2 className="text-2xl font-bold">
+            {data.symbol} - {data.type}
+          </h2>
+          {/* Индикатор статуса WebSocket */}
+          <div className="flex items-center gap-2">
+            <div
+              className={`w-3 h-3 rounded-full ${statusDisplay.color} ${
+                data.wsStatus === "connected" ? "animate-pulse" : ""
+              }`}
+            ></div>
+            <span className={`text-sm font-medium ${statusDisplay.textColor}`}>
+              {statusDisplay.text}
+            </span>
+          </div>
+        </div>
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
           <div>
             <div className="text-gray-600">Mid Price</div>
             <div className="font-mono text-lg">
-              {data.midPrice?.toFixed(2) || 'N/A'}
+              {data.midPrice?.toFixed(2) || "N/A"}
             </div>
           </div>
           <div>
             <div className="text-gray-600">Spread</div>
             <div className="font-mono text-lg">
-              {data.spread?.toFixed(2) || 'N/A'}
+              {data.spread?.toFixed(2) || "N/A"}
             </div>
           </div>
           <div>
             <div className="text-gray-600">Best Bid</div>
             <div className="font-mono text-lg">
-              {data.bestBid?.price.toFixed(2) || 'N/A'}
+              {data.bestBid?.price.toFixed(2) || "N/A"}
             </div>
           </div>
           <div>
             <div className="text-gray-600">Best Ask</div>
             <div className="font-mono text-lg">
-              {data.bestAsk?.price.toFixed(2) || 'N/A'}
+              {data.bestAsk?.price.toFixed(2) || "N/A"}
             </div>
           </div>
-        </div>
-        <div className="text-xs text-gray-500 mt-2">
-          Обновлено {timeSinceUpdate}с назад
         </div>
       </div>
 
@@ -154,7 +205,6 @@ export default function OrderBookTable({
                 <th className="px-4 py-2 border text-red-700">ASK Объем</th>
                 <th className="px-4 py-2 border">DIFF</th>
                 <th className="px-4 py-2 border">DIFF %</th>
-                <th className="px-4 py-2 border">Тренд</th>
               </tr>
             </thead>
             <tbody>
@@ -173,22 +223,21 @@ export default function OrderBookTable({
                     <td className="px-4 py-2 border text-right font-mono text-red-700">
                       {dv.askVolume.toFixed(4)}
                     </td>
-                    <td className={`px-4 py-2 border text-right font-mono ${
-                      isBullish ? 'text-green-700' : 'text-red-700'
-                    }`}>
-                      {diff.diff > 0 ? '+' : ''}{diff.diff.toFixed(4)}
+                    <td
+                      className={`px-4 py-2 border text-right font-mono ${
+                        isBullish ? "text-green-700" : "text-red-700"
+                      }`}
+                    >
+                      {diff.diff > 0 ? "+" : ""}
+                      {diff.diff.toFixed(4)}
                     </td>
-                    <td className={`px-4 py-2 border text-right font-mono ${
-                      isBullish ? 'text-green-700' : 'text-red-700'
-                    }`}>
-                      {diff.percentage > 0 ? '+' : ''}{diff.percentage.toFixed(2)}%
-                    </td>
-                    <td className="px-4 py-2 border text-center">
-                      {isBullish ? (
-                        <span className="text-green-700">▲ Бычий</span>
-                      ) : (
-                        <span className="text-red-700">▼ Медвежий</span>
-                      )}
+                    <td
+                      className={`px-4 py-2 border text-right font-mono ${
+                        isBullish ? "text-green-700" : "text-red-700"
+                      }`}
+                    >
+                      {diff.percentage > 0 ? "+" : ""}
+                      {diff.percentage.toFixed(2)}%
                     </td>
                   </tr>
                 );
@@ -199,63 +248,54 @@ export default function OrderBookTable({
       </div>
 
       {/* Топ ордеров */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-        {/* Bids */}
-        <div>
-          <h3 className="text-xl font-semibold mb-3 text-green-700">
-            Топ Bids (покупка)
-          </h3>
-          <div className="overflow-x-auto">
-            <table className="min-w-full bg-white border border-gray-300">
-              <thead className="bg-green-50">
-                <tr>
-                  <th className="px-4 py-2 border">Цена</th>
-                  <th className="px-4 py-2 border">Объем</th>
-                </tr>
-              </thead>
-              <tbody>
-                {data.bids.slice(0, 10).map((bid, index) => (
-                  <tr key={index} className="hover:bg-green-50">
-                    <td className="px-4 py-2 border text-right font-mono">
-                      {bid.price.toFixed(2)}
-                    </td>
-                    <td className="px-4 py-2 border text-right font-mono">
-                      {bid.volume.toFixed(8)}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        </div>
+      {/* Топ ордеров */}
+      <div>
+        <h3 className="text-xl font-semibold mb-3 text-gray-800">
+          Топ ордеров (Bids / Asks)
+        </h3>
 
-        {/* Asks */}
-        <div>
-          <h3 className="text-xl font-semibold mb-3 text-red-700">
-            Топ Asks (продажа)
-          </h3>
-          <div className="overflow-x-auto">
-            <table className="min-w-full bg-white border border-gray-300">
-              <thead className="bg-red-50">
-                <tr>
-                  <th className="px-4 py-2 border">Цена</th>
-                  <th className="px-4 py-2 border">Объем</th>
-                </tr>
-              </thead>
-              <tbody>
-                {data.asks.slice(0, 10).map((ask, index) => (
-                  <tr key={index} className="hover:bg-red-50">
-                    <td className="px-4 py-2 border text-right font-mono">
-                      {ask.price.toFixed(2)}
-                    </td>
-                    <td className="px-4 py-2 border text-right font-mono">
-                      {ask.volume.toFixed(8)}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+        <div className="overflow-x-auto">
+          <table className="min-w-full bg-white border border-gray-300">
+            <thead>
+              <tr className="bg-gray-100">
+                <th className="px-4 py-2 border text-green-700">Цена (Bids)</th>
+                <th className="px-4 py-2 border text-green-700">
+                  Объем (Bids)
+                </th>
+                <th className="px-4 py-2 border text-red-700">Цена (Asks)</th>
+                <th className="px-4 py-2 border text-red-700">Объем (Asks)</th>
+              </tr>
+            </thead>
+            <tbody>
+              {Array.from({
+                length: Math.max(data.bids.length, data.asks.length),
+              })
+                .slice(0, 10)
+                .map((_, i) => {
+                  const bid = data.bids[i];
+                  const ask = data.asks[i];
+                  return (
+                    <tr key={i} className="hover:bg-gray-50">
+                      {/* Bids */}
+                      <td className="px-4 py-2 border text-right font-mono text-green-700">
+                        {bid ? bid.price.toFixed(2) : "-"}
+                      </td>
+                      <td className="px-4 py-2 border text-right font-mono text-green-700">
+                        {bid ? bid.volume.toFixed(8) : "-"}
+                      </td>
+
+                      {/* Asks */}
+                      <td className="px-4 py-2 border text-right font-mono text-red-700">
+                        {ask ? ask.price.toFixed(2) : "-"}
+                      </td>
+                      <td className="px-4 py-2 border text-right font-mono text-red-700">
+                        {ask ? ask.volume.toFixed(8) : "-"}
+                      </td>
+                    </tr>
+                  );
+                })}
+            </tbody>
+          </table>
         </div>
       </div>
     </div>
