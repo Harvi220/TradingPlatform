@@ -1,5 +1,6 @@
 /**
- * Сервис для управления и обработки order book данных
+ * Сервис для управления order book (стакана ордеров)
+ * Загружает начальный snapshot через REST API и обновляет данные в реальном времени через WebSocket
  */
 
 import { MarketType, TradingSymbol } from '../../../shared/types/common.types';
@@ -10,9 +11,29 @@ import { validateOrderBook } from '../../utils/validators/orderBookValidator';
 import { BinanceWebSocketService } from './WebSocketService';
 
 export class OrderBookService {
+  // Текущее состояние стакана ордеров
   private orderBook: OrderBook;
+
+  // WebSocket сервис для получения обновлений в реальном времени
   private wsService: BinanceWebSocketService;
+
+  // Список callback-функций для уведомления об обновлениях
   private updateCallbacks: Array<(orderBook: OrderBook) => void> = [];
+
+  // Буфер для хранения WebSocket updates до загрузки snapshot
+  private updateBuffer: BinanceDepthUpdate[] = [];
+
+  // Флаг: загружен ли начальный snapshot
+  private isSnapshotLoaded = false;
+
+  // Время последней перезагрузки snapshot (для rate limiting)
+  private lastSnapshotReloadTime = 0;
+
+  // Количество попыток перезагрузки (для exponential backoff)
+  private snapshotReloadAttempts = 0;
+
+  // Минимальный интервал между перезагрузками snapshot (предотвращает rate limit)
+  private readonly MIN_RELOAD_INTERVAL = 5000;
 
   constructor(
     private symbol: TradingSymbol,
@@ -27,26 +48,86 @@ export class OrderBookService {
       timestamp: Date.now(),
     };
 
-    // Создаем WebSocket сервис
+    // Создаем WebSocket сервис с callback-функциями
     this.wsService = new BinanceWebSocketService(
       symbol,
       marketType,
-      (update) => this.handleDepthUpdate(update),
-      (error) => this.handleError(error),
-      (status) => this.handleStatusChange(status)
+      (update) => this.handleDepthUpdate(update),  // Обработка обновлений
+      (error) => this.handleError(error),          // Обработка ошибок
+      (status) => this.handleStatusChange(status)  // Обработка изменения статуса
     );
   }
 
   /**
-   * Начать получение данных
+   * Запустить сервис: подключить WebSocket, загрузить snapshot, применить буферизированные updates
    */
-  public start(): void {
+  public async start(): Promise<void> {
     console.log(`Starting OrderBookService for ${this.symbol} ${this.marketType}`);
+
+    // 1. Подключаем WebSocket ПЕРВЫМ (updates будут буферизироваться)
     this.wsService.connect();
+
+    // 2. Ждем установки соединения
+    await new Promise(resolve => setTimeout(resolve, 500));
+
+    // 3. Загружаем начальный snapshot через REST API
+    await this.loadInitialSnapshot();
+
+    // 4. Применяем все буферизированные updates, которые пришли во время загрузки
+    this.applyBufferedUpdates();
+
+    // 5. Отмечаем, что snapshot загружен (теперь updates будут применяться сразу)
+    this.isSnapshotLoaded = true;
   }
 
   /**
-   * Остановить получение данных
+   * Загрузить начальный snapshot order book через REST API Binance
+   * Возвращает до 1000 лучших bid и ask ордеров
+   */
+  private async loadInitialSnapshot(): Promise<void> {
+    try {
+      // Выбираем URL в зависимости от типа рынка
+      const baseUrl = this.marketType === 'SPOT'
+        ? 'https://api.binance.com/api/v3/depth'
+        : 'https://fapi.binance.com/fapi/v1/depth';
+
+      const url = `${baseUrl}?symbol=${this.symbol}&limit=1000`;
+
+      console.log(`Loading initial snapshot for ${this.symbol} from ${url}`);
+
+      const response = await fetch(url);
+      if (!response.ok) {
+        throw new Error(`Failed to load snapshot: ${response.statusText}`);
+      }
+
+      const data = await response.json();
+
+      // Парсим bids (ордера на покупку) из формата [price, volume]
+      this.orderBook.bids = data.bids.map((bid: [string, string]) => ({
+        price: parsePrice(bid[0]),
+        volume: parseVolume(bid[1])
+      }));
+
+      // Парсим asks (ордера на продажу) из формата [price, volume]
+      this.orderBook.asks = data.asks.map((ask: [string, string]) => ({
+        price: parsePrice(ask[0]),
+        volume: parseVolume(ask[1])
+      }));
+
+      // Сохраняем lastUpdateId для синхронизации с WebSocket updates
+      this.orderBook.lastUpdateId = data.lastUpdateId;
+      this.orderBook.timestamp = Date.now();
+
+      console.log(`Loaded snapshot for ${this.symbol}: ${this.orderBook.bids.length} bids, ${this.orderBook.asks.length} asks`);
+
+    } catch (error) {
+      console.error(`Error loading initial snapshot for ${this.symbol}:`, error);
+      throw error;
+    }
+  }
+
+  /**
+   * Остановить сервис и отключить WebSocket
    */
   public stop(): void {
     console.log(`Stopping OrderBookService for ${this.symbol} ${this.marketType}`);
@@ -54,14 +135,14 @@ export class OrderBookService {
   }
 
   /**
-   * Получить текущий order book
+   * Получить текущее состояние order book (копию, чтобы избежать изменений извне)
    */
   public getOrderBook(): OrderBook {
     return { ...this.orderBook };
   }
 
   /**
-   * Подписаться на обновления order book
+   * Подписаться на обновления: callback будет вызван при каждом изменении order book
    */
   public onUpdate(callback: (orderBook: OrderBook) => void): void {
     this.updateCallbacks.push(callback);
@@ -75,27 +156,130 @@ export class OrderBookService {
   }
 
   /**
-   * Обработка depth update от Binance
+   * Обработка depth update от Binance WebSocket
+   * До загрузки snapshot - буферизирует updates, после - применяет сразу
    */
   private handleDepthUpdate(update: BinanceDepthUpdate): void {
-    // Обновляем bids
+    // Если snapshot еще не загружен, сохраняем updates в буфер
+    if (!this.isSnapshotLoaded) {
+      this.updateBuffer.push(update);
+
+      // Ограничиваем размер буфера (предотвращаем переполнение памяти)
+      if (this.updateBuffer.length > 1000) {
+        this.updateBuffer.shift(); // Удаляем самый старый update
+      }
+      return;
+    }
+
+    // Snapshot загружен - применяем update сразу
+    this.applyUpdate(update);
+  }
+
+  /**
+   * Применить WebSocket update к order book
+   * Проверяет на пропущенные updates (gap) и валидирует результат
+   */
+  private applyUpdate(update: BinanceDepthUpdate): void {
+    if (this.orderBook.lastUpdateId !== undefined) {
+      // Пропускаем старые updates (уже учтены в snapshot)
+      if (update.u <= this.orderBook.lastUpdateId) {
+        return;
+      }
+
+      // Проверяем на пропущенные updates (gap)
+      // Согласно Binance API: update.U должен быть lastUpdateId + 1
+      if (update.U > this.orderBook.lastUpdateId + 1) {
+        const gap = update.U - this.orderBook.lastUpdateId - 1;
+        console.warn(`Gap in updates detected for ${this.symbol}: expected ${this.orderBook.lastUpdateId + 1}, got ${update.U} (gap: ${gap} updates). Attempting to reload snapshot...`);
+
+        // Перезагружаем snapshot при обнаружении gap (с rate limiting)
+        this.reloadSnapshot();
+        return;
+      }
+    }
+
+    // Обновляем bids (ордера на покупку)
     this.updateOrders(this.orderBook.bids, update.b, 'bid');
 
-    // Обновляем asks
+    // Обновляем asks (ордера на продажу)
     this.updateOrders(this.orderBook.asks, update.a, 'ask');
 
-    // Обновляем timestamp
+    // Обновляем timestamp и lastUpdateId
     this.orderBook.timestamp = update.E;
     this.orderBook.lastUpdateId = update.u;
 
-    // Валидация
+    // Валидируем order book (проверяем корректность данных)
     const validation = validateOrderBook(this.orderBook);
     if (!validation.isValid) {
       console.warn(`Order book validation failed for ${this.symbol}:`, validation.errors);
     }
 
-    // Уведомляем подписчиков
+    // Уведомляем всех подписчиков об обновлении
     this.notifyUpdate();
+  }
+
+  /**
+   * Применить все буферизированные updates после загрузки snapshot
+   * Фильтрует только те updates, которые новее snapshot
+   */
+  private applyBufferedUpdates(): void {
+    console.log(`Applying ${this.updateBuffer.length} buffered updates for ${this.symbol}`);
+
+    // Фильтруем: оставляем только updates новее snapshot
+    const relevantUpdates = this.updateBuffer.filter(update => {
+      return update.u > (this.orderBook.lastUpdateId || 0);
+    });
+
+    console.log(`Found ${relevantUpdates.length} relevant updates to apply`);
+
+    // Применяем updates по порядку
+    for (const update of relevantUpdates) {
+      this.applyUpdate(update);
+    }
+
+    // Очищаем буфер
+    this.updateBuffer = [];
+  }
+
+  /**
+   * Перезагрузить snapshot при обнаружении gap
+   * Использует rate limiting (минимум 5 сек между попытками) и exponential backoff
+   */
+  private async reloadSnapshot(): Promise<void> {
+    const now = Date.now();
+    const timeSinceLastReload = now - this.lastSnapshotReloadTime;
+
+    // Rate limiting: минимум 5 секунд между перезагрузками
+    if (timeSinceLastReload < this.MIN_RELOAD_INTERVAL) {
+      console.log(`Skipping snapshot reload for ${this.symbol}: too soon (${timeSinceLastReload}ms < ${this.MIN_RELOAD_INTERVAL}ms)`);
+      return;
+    }
+
+    // Exponential backoff: задержка удваивается с каждой попыткой (1s, 2s, 4s, 8s, ... до 30s)
+    const backoffDelay = Math.min(1000 * Math.pow(2, this.snapshotReloadAttempts), 30000);
+    if (this.snapshotReloadAttempts > 0 && timeSinceLastReload < backoffDelay) {
+      console.log(`Skipping snapshot reload for ${this.symbol}: backoff delay (${timeSinceLastReload}ms < ${backoffDelay}ms)`);
+      return;
+    }
+
+    console.log(`Reloading snapshot for ${this.symbol}... (attempt ${this.snapshotReloadAttempts + 1})`);
+
+    // Временно отключаем обработку updates
+    this.isSnapshotLoaded = false;
+    this.updateBuffer = [];
+    this.lastSnapshotReloadTime = now;
+
+    try {
+      // Загружаем новый snapshot
+      await this.loadInitialSnapshot();
+      this.isSnapshotLoaded = true;
+      this.snapshotReloadAttempts = 0; // Сбрасываем счетчик при успехе
+      console.log(`Snapshot reloaded for ${this.symbol}`);
+    } catch (error) {
+      console.error(`Failed to reload snapshot for ${this.symbol}:`, error);
+      this.snapshotReloadAttempts++; // Увеличиваем счетчик для exponential backoff
+      this.isSnapshotLoaded = true;   // Продолжаем работать с текущими данными
+    }
   }
 
   /**

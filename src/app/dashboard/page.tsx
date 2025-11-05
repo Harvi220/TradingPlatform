@@ -6,6 +6,7 @@
 
 import { useState } from "react";
 import OrderBookTable from "@/components/orderbook/OrderBookTable";
+import Navigation from "@/components/layout/Navigation";
 
 export default function DashboardPage() {
   const [symbol, setSymbol] = useState("BTCUSDT");
@@ -14,7 +15,9 @@ export default function DashboardPage() {
   const symbols = ["BTCUSDT", "ETHUSDT", "BNBUSDT", "SOLUSDT", "XRPUSDT"];
 
   return (
-    <div className="min-h-screen bg-gray-50 p-8">
+    <div className="min-h-screen bg-gray-50">
+      <Navigation />
+      <div className="p-8">
       <div className="max-w-7xl mx-auto">
         {/* Заголовок */}
         <div className="mb-8">
@@ -86,9 +89,10 @@ export default function DashboardPage() {
           <OrderBookTable
             marketType={marketType}
             symbol={symbol}
-            refreshInterval={1000}
+            refreshInterval={300}
           />
         </div>
+      </div>
       </div>
     </div>
   );

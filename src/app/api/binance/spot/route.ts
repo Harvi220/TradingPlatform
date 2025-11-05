@@ -21,17 +21,19 @@ export async function GET(request: NextRequest) {
     const { searchParams } = new URL(request.url);
     const symbol = searchParams.get('symbol') || 'BTCUSDT';
 
+    // Используем уникальный ключ: symbol + marketType
+    const cacheKey = `${symbol}:SPOT`;
+
     // Получаем или создаем OrderBookService для символа
-    let service = orderBookServices.get(symbol);
+    let service = orderBookServices.get(cacheKey);
 
     if (!service) {
       console.log(`Creating new OrderBookService for ${symbol} SPOT`);
       service = new OrderBookService(symbol, 'SPOT');
-      service.start();
-      orderBookServices.set(symbol, service);
+      orderBookServices.set(cacheKey, service);
 
-      // Ждем немного, чтобы получить первые данные
-      await new Promise(resolve => setTimeout(resolve, 1000));
+      // Запускаем сервис и ждем загрузки snapshot
+      await service.start();
     }
 
     // Получаем текущий order book
@@ -96,14 +98,17 @@ export async function DELETE(request: NextRequest) {
     const { searchParams } = new URL(request.url);
     const symbol = searchParams.get('symbol') || 'BTCUSDT';
 
-    const service = orderBookServices.get(symbol);
+    // Используем уникальный ключ: symbol + marketType
+    const cacheKey = `${symbol}:SPOT`;
+
+    const service = orderBookServices.get(cacheKey);
 
     if (service) {
       service.stop();
-      orderBookServices.delete(symbol);
+      orderBookServices.delete(cacheKey);
 
       return NextResponse.json({
-        message: `OrderBookService for ${symbol} stopped`,
+        message: `OrderBookService for ${symbol} SPOT stopped`,
         timestamp: Date.now(),
       });
     }

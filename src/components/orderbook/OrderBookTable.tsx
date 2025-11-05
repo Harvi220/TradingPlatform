@@ -49,6 +49,20 @@ export default function OrderBookTable({
   const [error, setError] = useState<string | null>(null);
   const [lastUpdate, setLastUpdate] = useState<number>(0);
 
+  // Извлекаем базовую валюту из символа (например, BTC из BTCUSDT)
+  const getBaseCurrency = (symbol: string): string => {
+    // Удаляем известные quote валюты
+    const quoteCurrencies = ['USDT', 'USDC', 'BUSD', 'USD', 'BTC', 'ETH', 'BNB'];
+    for (const quote of quoteCurrencies) {
+      if (symbol.endsWith(quote)) {
+        return symbol.slice(0, -quote.length);
+      }
+    }
+    return symbol;
+  };
+
+  const baseCurrency = getBaseCurrency(symbol);
+
   useEffect(() => {
     const fetchData = async () => {
       try {
@@ -169,25 +183,25 @@ export default function OrderBookTable({
           <div>
             <div className="text-gray-600">Mid Price</div>
             <div className="font-mono text-lg">
-              {data.midPrice?.toFixed(2) || "N/A"}
+              {data.midPrice ? `$${data.midPrice.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 8 })}` : "N/A"}
             </div>
           </div>
           <div>
             <div className="text-gray-600">Spread</div>
             <div className="font-mono text-lg">
-              {data.spread?.toFixed(2) || "N/A"}
+              {data.spread ? `$${data.spread.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 8 })}` : "N/A"}
             </div>
           </div>
           <div>
             <div className="text-gray-600">Best Bid</div>
             <div className="font-mono text-lg">
-              {data.bestBid?.price.toFixed(2) || "N/A"}
+              {data.bestBid ? `$${data.bestBid.price.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 8 })}` : "N/A"}
             </div>
           </div>
           <div>
             <div className="text-gray-600">Best Ask</div>
             <div className="font-mono text-lg">
-              {data.bestAsk?.price.toFixed(2) || "N/A"}
+              {data.bestAsk ? `$${data.bestAsk.price.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 8 })}` : "N/A"}
             </div>
           </div>
         </div>
@@ -205,12 +219,14 @@ export default function OrderBookTable({
                 <th className="px-4 py-2 border text-red-700">ASK Объем</th>
                 <th className="px-4 py-2 border">DIFF</th>
                 <th className="px-4 py-2 border">DIFF %</th>
+                <th className="px-4 py-2 border">Delta (Bid/Ask)</th>
               </tr>
             </thead>
             <tbody>
               {data.depthVolumes.map((dv, index) => {
                 const diff = data.diffs[index];
                 const isBullish = diff.diff > 0;
+                const delta = dv.askVolume !== 0 ? dv.bidVolume / dv.askVolume : 0;
 
                 return (
                   <tr key={dv.depth} className="hover:bg-gray-50">
@@ -218,10 +234,10 @@ export default function OrderBookTable({
                       {dv.depth}%
                     </td>
                     <td className="px-4 py-2 border text-right font-mono text-green-700">
-                      {dv.bidVolume.toFixed(4)}
+                      {dv.bidVolume.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 4 })} {baseCurrency}
                     </td>
                     <td className="px-4 py-2 border text-right font-mono text-red-700">
-                      {dv.askVolume.toFixed(4)}
+                      {dv.askVolume.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 4 })} {baseCurrency}
                     </td>
                     <td
                       className={`px-4 py-2 border text-right font-mono ${
@@ -229,7 +245,7 @@ export default function OrderBookTable({
                       }`}
                     >
                       {diff.diff > 0 ? "+" : ""}
-                      {diff.diff.toFixed(4)}
+                      {diff.diff.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 4 })} {baseCurrency}
                     </td>
                     <td
                       className={`px-4 py-2 border text-right font-mono ${
@@ -238,6 +254,9 @@ export default function OrderBookTable({
                     >
                       {diff.percentage > 0 ? "+" : ""}
                       {diff.percentage.toFixed(2)}%
+                    </td>
+                    <td className="px-4 py-2 border text-right font-mono text-blue-700">
+                      {delta.toFixed(4)}
                     </td>
                   </tr>
                 );
@@ -278,18 +297,18 @@ export default function OrderBookTable({
                     <tr key={i} className="hover:bg-gray-50">
                       {/* Bids */}
                       <td className="px-4 py-2 border text-right font-mono text-green-700">
-                        {bid ? bid.price.toFixed(2) : "-"}
+                        {bid ? `$${bid.price.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 8 })}` : "-"}
                       </td>
                       <td className="px-4 py-2 border text-right font-mono text-green-700">
-                        {bid ? bid.volume.toFixed(8) : "-"}
+                        {bid ? `${bid.volume.toFixed(8)} ${baseCurrency}` : "-"}
                       </td>
 
                       {/* Asks */}
                       <td className="px-4 py-2 border text-right font-mono text-red-700">
-                        {ask ? ask.price.toFixed(2) : "-"}
+                        {ask ? `$${ask.price.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 8 })}` : "-"}
                       </td>
                       <td className="px-4 py-2 border text-right font-mono text-red-700">
-                        {ask ? ask.volume.toFixed(8) : "-"}
+                        {ask ? `${ask.volume.toFixed(8)} ${baseCurrency}` : "-"}
                       </td>
                     </tr>
                   );
