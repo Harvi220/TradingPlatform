@@ -64,6 +64,11 @@ export default function OrderBookTable({
   const baseCurrency = getBaseCurrency(symbol);
 
   useEffect(() => {
+    // Сбрасываем состояние при смене символа или рынка
+    setLoading(true);
+    setError(null);
+    setData(null);
+
     const fetchData = async () => {
       try {
         const response = await fetch(
@@ -96,7 +101,10 @@ export default function OrderBookTable({
     // Периодическое обновление
     const interval = setInterval(fetchData, refreshInterval);
 
-    return () => clearInterval(interval);
+    // Cleanup: очищаем interval при размонтировании или смене зависимостей
+    return () => {
+      clearInterval(interval);
+    };
   }, [marketType, symbol, refreshInterval]);
 
   if (loading) {

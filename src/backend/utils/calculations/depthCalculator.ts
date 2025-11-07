@@ -13,14 +13,14 @@ export function calculateDepthVolumes(
   orderBook: OrderBook,
   depth: DepthLevel
 ): DepthVolumes {
-  // Определяем текущую цену (mid price)
+  // Определяем лучшие цены bid и ask
   const bestBid = orderBook.bids[0]?.price || 0;
   const bestAsk = orderBook.asks[0]?.price || 0;
   const currentPrice = calculateMidPrice(bestBid, bestAsk);
 
-  // Рассчитываем диапазоны цен для bid и ask
-  const bidRange = calculatePriceRange(currentPrice, depth, 'bid');
-  const askRange = calculatePriceRange(currentPrice, depth, 'ask');
+  // ИСПРАВЛЕНО: Рассчитываем диапазоны от bestBid и bestAsk (не от midPrice!)
+  const bidRange = calculatePriceRange(bestBid, depth, 'bid');
+  const askRange = calculatePriceRange(bestAsk, depth, 'ask');
 
   // Суммируем объемы в диапазонах
   const bidVolume = sumVolumeInRange(orderBook.bids, bidRange);

@@ -14,29 +14,32 @@ export function calculateMidPrice(bestBid: number, bestAsk: number): number {
 
 /**
  * Рассчитать диапазон цен для заданной глубины
- * @param currentPrice - текущая рыночная цена
+ * @param basePrice - базовая цена (bestBid для bid, bestAsk для ask)
  * @param depth - глубина в процентах (например, 5 для 5%)
  * @param side - 'bid' или 'ask'
  */
 export function calculatePriceRange(
-  currentPrice: number,
+  basePrice: number,
   depth: DepthLevel,
   side: 'bid' | 'ask'
 ): PriceRange {
   const depthDecimal = getDepthDecimal(depth);
-  const priceChange = currentPrice * depthDecimal;
 
   if (side === 'bid') {
-    // Для bid: от (цена - глубина) до текущей цены
+    // Для bid: от (bestBid × (1 - depth%)) до bestBid
+    // Пример: bestBid=$100k, depth=5% → от $95k до $100k
+    const lowerBound = basePrice * (1 - depthDecimal);
     return {
-      from: currentPrice - priceChange,
-      to: currentPrice,
+      from: lowerBound,
+      to: basePrice,
     };
   } else {
-    // Для ask: от текущей цены до (цена + глубина)
+    // Для ask: от bestAsk до (bestAsk × (1 + depth%))
+    // Пример: bestAsk=$100k, depth=5% → от $100k до $105k
+    const upperBound = basePrice * (1 + depthDecimal);
     return {
-      from: currentPrice,
-      to: currentPrice + priceChange,
+      from: basePrice,
+      to: upperBound,
     };
   }
 }

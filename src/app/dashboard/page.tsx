@@ -6,6 +6,7 @@
 
 import { useState } from "react";
 import OrderBookTable from "@/components/orderbook/OrderBookTable";
+import OrderBookRestTable from "@/components/orderbook/OrderBookRestTable";
 import Navigation from "@/components/layout/Navigation";
 
 export default function DashboardPage() {
@@ -84,12 +85,24 @@ export default function DashboardPage() {
           </div>
         </div>
 
-        {/* Таблица данных */}
-        <div className="bg-white p-6 rounded-lg shadow-md">
+        {/* Таблица данных WebSocket */}
+        <div className="bg-white p-6 rounded-lg shadow-md mb-8">
+          <h2 className="text-2xl font-bold mb-4 text-blue-600">WebSocket данные (режим реального времени)</h2>
           <OrderBookTable
+            key={`${symbol}-${marketType}`}
             marketType={marketType}
             symbol={symbol}
             refreshInterval={300}
+          />
+        </div>
+
+        {/* Таблица данных REST API */}
+        <div className="bg-white p-6 rounded-lg shadow-md">
+          <h2 className="text-2xl font-bold mb-4 text-purple-600">REST API данные (обновление каждую минуту)</h2>
+          <OrderBookRestTable
+            key={`rest-${symbol}-${marketType}`}
+            marketType={marketType}
+            symbol={symbol}
           />
         </div>
       </div>

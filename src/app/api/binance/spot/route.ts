@@ -39,6 +39,9 @@ export async function GET(request: NextRequest) {
     // Получаем текущий order book
     const orderBook = service.getOrderBook();
 
+    // ОТЛАДКА: Логируем количество ордеров
+    console.log(`OrderBook for ${symbol}: ${orderBook.bids.length} bids, ${orderBook.asks.length} asks`);
+
     // Проверяем, есть ли данные
     if (orderBook.bids.length === 0 || orderBook.asks.length === 0) {
       return NextResponse.json(

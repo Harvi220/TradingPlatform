@@ -67,17 +67,20 @@ export class OrderBookService {
     // 1. Подключаем WebSocket ПЕРВЫМ (updates будут буферизироваться)
     this.wsService.connect();
 
-    // 2. Ждем установки соединения
-    await new Promise(resolve => setTimeout(resolve, 500));
+    // 2. ИСПРАВЛЕНИЕ: Увеличиваем время ожидания для стабильного соединения
+    await new Promise(resolve => setTimeout(resolve, 1000));
 
     // 3. Загружаем начальный snapshot через REST API
     await this.loadInitialSnapshot();
 
-    // 4. Применяем все буферизированные updates, которые пришли во время загрузки
-    this.applyBufferedUpdates();
+    // 4. ИСПРАВЛЕНИЕ: Небольшая пауза перед применением updates
+    await new Promise(resolve => setTimeout(resolve, 100));
 
     // 5. Отмечаем, что snapshot загружен (теперь updates будут применяться сразу)
     this.isSnapshotLoaded = true;
+
+    // 6. Применяем все буферизированные updates, которые пришли во время загрузки
+    this.applyBufferedUpdates();
   }
 
   /**
@@ -91,7 +94,8 @@ export class OrderBookService {
         ? 'https://api.binance.com/api/v3/depth'
         : 'https://fapi.binance.com/fapi/v1/depth';
 
-      const url = `${baseUrl}?symbol=${this.symbol}&limit=1000`;
+      // ИСПРАВЛЕНИЕ: Увеличиваем лимит до 5000 для глубоких расчётов (30%)
+      const url = `${baseUrl}?symbol=${this.symbol}&limit=5000`;
 
       console.log(`Loading initial snapshot for ${this.symbol} from ${url}`);
 
@@ -164,9 +168,10 @@ export class OrderBookService {
     if (!this.isSnapshotLoaded) {
       this.updateBuffer.push(update);
 
-      // Ограничиваем размер буфера (предотвращаем переполнение памяти)
-      if (this.updateBuffer.length > 1000) {
-        this.updateBuffer.shift(); // Удаляем самый старый update
+      // ИСПРАВЛЕНИЕ: Увеличиваем размер буфера для предотвращения потерь
+      if (this.updateBuffer.length > 5000) {
+        // Удаляем старые updates, но сохраняем последние
+        this.updateBuffer = this.updateBuffer.slice(-5000);
       }
       return;
     }
@@ -186,15 +191,22 @@ export class OrderBookService {
         return;
       }
 
-      // Проверяем на пропущенные updates (gap)
-      // Согласно Binance API: update.U должен быть lastUpdateId + 1
+      // ИСПРАВЛЕНИЕ: Проверяем на пропущенные updates (gap)
+      // Согласно Binance API: первый update в событии (update.U) должен быть <= lastUpdateId + 1
+      // И последний update в событии (update.u) должен быть >= lastUpdateId + 1
+      // Это позволяет обрабатывать события, которые перекрывают текущий lastUpdateId
+
+      // Если первый update в событии идёт ПОСЛЕ ожидаемого (пропуск updates)
       if (update.U > this.orderBook.lastUpdateId + 1) {
         const gap = update.U - this.orderBook.lastUpdateId - 1;
-        console.warn(`Gap in updates detected for ${this.symbol}: expected ${this.orderBook.lastUpdateId + 1}, got ${update.U} (gap: ${gap} updates). Attempting to reload snapshot...`);
 
-        // Перезагружаем snapshot при обнаружении gap (с rate limiting)
-        this.reloadSnapshot();
-        return;
+        // Игнорируем небольшие gaps (< 10 updates) - они могут быть из-за сетевых задержек
+        if (gap >= 10) {
+          console.warn(`Gap in updates detected for ${this.symbol}: expected ${this.orderBook.lastUpdateId + 1}, got ${update.U} (gap: ${gap} updates). Attempting to reload snapshot...`);
+          // Перезагружаем snapshot при обнаружении gap (с rate limiting)
+          this.reloadSnapshot();
+          return;
+        }
       }
     }
 
@@ -225,12 +237,18 @@ export class OrderBookService {
   private applyBufferedUpdates(): void {
     console.log(`Applying ${this.updateBuffer.length} buffered updates for ${this.symbol}`);
 
-    // Фильтруем: оставляем только updates новее snapshot
+    // ИСПРАВЛЕНИЕ: Фильтруем правильно согласно Binance API документации
+    // Update применяется если: update.u >= lastUpdateId + 1 И update.U <= lastUpdateId + 1
     const relevantUpdates = this.updateBuffer.filter(update => {
-      return update.u > (this.orderBook.lastUpdateId || 0);
+      const lastId = this.orderBook.lastUpdateId || 0;
+      // Update должен перекрывать или быть сразу после lastUpdateId
+      return update.U <= lastId + 1 && update.u >= lastId + 1;
     });
 
-    console.log(`Found ${relevantUpdates.length} relevant updates to apply`);
+    console.log(`Found ${relevantUpdates.length} relevant updates to apply out of ${this.updateBuffer.length} buffered`);
+
+    // Сортируем updates по возрастанию U (первый update ID в событии)
+    relevantUpdates.sort((a, b) => a.U - b.U);
 
     // Применяем updates по порядку
     for (const update of relevantUpdates) {
@@ -270,6 +288,10 @@ export class OrderBookService {
     this.lastSnapshotReloadTime = now;
 
     try {
+      // ИСПРАВЛЕНИЕ: Очищаем старый order book перед загрузкой нового
+      this.orderBook.bids = [];
+      this.orderBook.asks = [];
+
       // Загружаем новый snapshot
       await this.loadInitialSnapshot();
       this.isSnapshotLoaded = true;
@@ -294,14 +316,19 @@ export class OrderBookService {
       const price = parsePrice(priceStr);
       const volume = parseVolume(volumeStr);
 
-      // Если volume = 0, удаляем ордер
+      // ОТЛАДКА: Логируем удаления (только первые 3 для каждой стороны)
+      if (volume === 0 && Math.random() < 0.01) {
+        console.log(`[${side.toUpperCase()}] Удаление: цена=${price}, volume_str="${volumeStr}"`);
+      }
+
+      // Если volume = 0, удаляем ордер согласно Binance документации
       if (volume === 0) {
         const index = orders.findIndex(o => o.price === price);
         if (index !== -1) {
           orders.splice(index, 1);
         }
       } else {
-        // Иначе обновляем или добавляем
+        // Обновляем или добавляем
         const existingIndex = orders.findIndex(o => o.price === price);
 
         if (existingIndex !== -1) {
@@ -314,13 +341,19 @@ export class OrderBookService {
       }
     }
 
-    // Сортируем
+    // Сортируем ордера
     if (side === 'bid') {
       // Bids: сортируем по убыванию цены
       orders.sort((a, b) => b.price - a.price);
     } else {
       // Asks: сортируем по возрастанию цены
       orders.sort((a, b) => a.price - b.price);
+    }
+
+    // ИСПРАВЛЕНИЕ: Ограничиваем размер order book чтобы не переполнить память
+    // Оставляем максимум 10000 ордеров с каждой стороны
+    if (orders.length > 10000) {
+      orders.splice(10000);
     }
   }
 

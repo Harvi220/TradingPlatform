@@ -92,7 +92,8 @@ export class BinanceWebSocketService {
       ? BINANCE_WS_URLS.SPOT
       : BINANCE_WS_URLS.FUTURES;
 
-    const stream = `${this.symbol.toLowerCase()}@depth@${UPDATE_SPEED.FAST}`;
+    // ИСПРАВЛЕНИЕ: Используем медленную скорость (1 раз в секунду вместо 10)
+    const stream = `${this.symbol.toLowerCase()}@depth@${UPDATE_SPEED.SLOW}`;
 
     return `${baseUrl}/${stream}`;
   }
