@@ -57,6 +57,25 @@ export async function GET(request: NextRequest) {
     // Рассчитываем объемы на всех глубинах
     const depthVolumes = calculateAllDepthVolumes(orderBook, DEPTH_LEVELS);
 
+    // Сохраняем снэпшоты для каждой глубины (для построения графиков)
+    const snapshots = depthVolumes.map(dv => ({
+      timestamp: Date.now(),
+      symbol: orderBook.symbol,
+      marketType: 'SPOT' as const,
+      depth: dv.depth,
+      bidVolume: dv.bidVolume,
+      askVolume: dv.askVolume,
+      bidVolumeUsd: dv.totalBidValue,
+      askVolumeUsd: dv.totalAskValue,
+    }));
+
+    // Отправляем снэпшоты в фоновом режиме (не блокируем ответ)
+    fetch('http://localhost:3000/api/snapshots', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(snapshots),
+    }).catch(err => console.error('Failed to save snapshots:', err));
+
     // Рассчитываем DIFF индикаторы
     const diffs = calculateAllDiffs(depthVolumes);
 

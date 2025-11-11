@@ -94,8 +94,8 @@ export class OrderBookService {
         ? 'https://api.binance.com/api/v3/depth'
         : 'https://fapi.binance.com/fapi/v1/depth';
 
-      // ИСПРАВЛЕНИЕ: Увеличиваем лимит до 5000 для глубоких расчётов (30%)
-      const url = `${baseUrl}?symbol=${this.symbol}&limit=5000`;
+      // Используем максимальный поддерживаемый лимит (1000 для обоих рынков)
+      const url = `${baseUrl}?symbol=${this.symbol}&limit=1000`;
 
       console.log(`Loading initial snapshot for ${this.symbol} from ${url}`);
 

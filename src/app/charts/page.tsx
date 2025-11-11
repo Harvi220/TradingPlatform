@@ -6,6 +6,8 @@
 
 import { useEffect, useRef, useState } from "react";
 import Navigation from "@/components/layout/Navigation";
+import LightweightChart from "@/components/charts/LightweightChart";
+import IndicatorsPanel from "@/components/charts/IndicatorsPanel";
 
 export default function ChartsPage() {
   const [symbol, setSymbol] = useState("BTCUSDT");
@@ -13,6 +15,70 @@ export default function ChartsPage() {
   const chartContainerRef = useRef<HTMLDivElement>(null);
 
   const symbols = ["BTCUSDT", "ETHUSDT", "BNBUSDT", "SOLUSDT", "XRPUSDT"];
+
+  // Состояние для индикаторов
+  const [enabledIndicators, setEnabledIndicators] = useState<{
+    bid: { [key: string]: boolean };
+    ask: { [key: string]: boolean };
+  }>({
+    bid: {
+      "1.5": false,
+      "3": true, // По умолчанию включен BID 3%
+      "5": false,
+      "8": false,
+      "15": false,
+      "30": false,
+    },
+    ask: {
+      "1.5": false,
+      "3": true, // По умолчанию включен ASK 3%
+      "5": false,
+      "8": false,
+      "15": false,
+      "30": false,
+    },
+  });
+
+  // Обработчик переключения индикаторов
+  const handleToggleIndicator = (type: "bid" | "ask", depth: string) => {
+    setEnabledIndicators((prev) => ({
+      ...prev,
+      [type]: {
+        ...prev[type],
+        [depth]: !prev[type][depth],
+      },
+    }));
+  };
+
+  // Автоматический запуск сбора данных для графиков bid/ask с регулярным опросом
+  useEffect(() => {
+    const endpoint = marketType === "spot"
+      ? `/api/binance/spot?symbol=${symbol}`
+      : `/api/binance/futures?symbol=${symbol}`;
+
+    const pollDataCollection = async () => {
+      try {
+        // Вызываем API для сохранения снэпшотов
+        const response = await fetch(endpoint);
+
+        if (!response.ok && response.status !== 503) {
+          console.warn(`[Charts] Data collection error:`, response.status);
+        }
+      } catch (error) {
+        console.error('[Charts] Error polling data collection:', error);
+      }
+    };
+
+    // Запускаем сразу
+    pollDataCollection();
+
+    // Опрашиваем каждую секунду для сохранения снэпшотов
+    const intervalId = setInterval(pollDataCollection, 1000);
+
+    return () => {
+      clearInterval(intervalId);
+    };
+  }, [symbol, marketType]);
 
   useEffect(() => {
     if (!chartContainerRef.current) return;
@@ -167,12 +233,45 @@ export default function ChartsPage() {
             </div>
           </div>
 
-          {/* График - увеличенная высота */}
+          {/* TradingView График - увеличенная высота */}
           <div className="bg-white rounded-lg shadow-md overflow-hidden">
             <div
               ref={chartContainerRef}
               style={{ height: "calc(100vh - 180px)", width: "100%" }}
             />
+          </div>
+
+          {/* Наши индикаторы BID/ASK - НИЖЕ TradingView виджета */}
+          <div className="mt-8">
+            <div className="mb-4">
+              <h2 className="text-2xl font-bold text-gray-900">
+                Индикаторы глубины BID/ASK
+              </h2>
+              <p className="text-sm text-gray-600 mt-1">
+                Исторические данные объемов на разных глубинах рынка
+              </p>
+            </div>
+
+            <div className="bg-white rounded-lg shadow-md p-4">
+              <div className="flex gap-4">
+                {/* График */}
+                <div className="flex-1">
+                  <LightweightChart
+                    symbol={symbol}
+                    marketType={marketType}
+                    enabledIndicators={enabledIndicators}
+                  />
+                </div>
+
+                {/* Панель управления индикаторами */}
+                <div>
+                  <IndicatorsPanel
+                    enabledIndicators={enabledIndicators}
+                    onToggle={handleToggleIndicator}
+                  />
+                </div>
+              </div>
+            </div>
           </div>
         </div>
       </div>
