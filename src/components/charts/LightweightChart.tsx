@@ -91,7 +91,7 @@ export default function LightweightChart({
           width: chartContainerRef.current.clientWidth,
           height: 500,
           layout: {
-            background: { type: 'solid' as const, color: "#FFFFFF" },
+            background: { color: "#FFFFFF" },
             textColor: "#333",
           },
           grid: {
