@@ -32,12 +32,13 @@ services:
     restart: unless-stopped
     environment:
       POSTGRES_USER: postgres
-      POSTGRES_PASSWORD: postgres
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
       POSTGRES_DB: tradingdb
     volumes:
       - postgres_data:/var/lib/postgresql/data
-    ports:
-      - "5432:5432"
+    # Порты не пробрасываем наружу - доступ только внутри Docker сети
+    # ports:
+    #   - "5432:5432"
     networks:
       - trading-network
     healthcheck:
@@ -53,8 +54,9 @@ services:
     restart: unless-stopped
     volumes:
       - redis_data:/data
-    ports:
-      - "6379:6379"
+    # Порты не пробрасываем наружу - доступ только внутри Docker сети
+    # ports:
+    #   - "6379:6379"
     networks:
       - trading-network
     healthcheck:
