@@ -70,7 +70,8 @@ export async function GET(request: NextRequest) {
     }));
 
     // Отправляем снэпшоты в фоновом режиме (не блокируем ответ)
-    fetch('http://localhost:3000/api/snapshots', {
+    const apiBaseUrl = process.env.API_BASE_URL || 'http://localhost:3000';
+    fetch(`${apiBaseUrl}/api/snapshots`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(snapshots),
