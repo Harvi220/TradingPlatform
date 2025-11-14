@@ -293,7 +293,7 @@ export default function LightweightChart({
 
           const { depth, type, data } = result;
           const seriesKey = `${type}-${depth}`;
-          const color = INDICATOR_COLORS[type][depth as keyof typeof INDICATOR_COLORS.bid];
+          const color = INDICATOR_COLORS[type as keyof typeof INDICATOR_COLORS][depth as keyof typeof INDICATOR_COLORS.bid];
 
           // Проверяем, есть ли уже series для этого индикатора
           let series = seriesMapRef.current.get(seriesKey);

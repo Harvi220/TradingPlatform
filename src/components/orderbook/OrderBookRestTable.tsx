@@ -111,12 +111,12 @@ export default function OrderBookRestTable({
       const binanceData = await response.json();
 
       // Обрабатываем данные
-      const bids = binanceData.bids.map(([price, volume]: [string, string]) => ({
+      const bids: Array<{ price: number; volume: number }> = binanceData.bids.map(([price, volume]: [string, string]) => ({
         price: parseFloat(price),
         volume: parseFloat(volume),
       }));
 
-      const asks = binanceData.asks.map(([price, volume]: [string, string]) => ({
+      const asks: Array<{ price: number; volume: number }> = binanceData.asks.map(([price, volume]: [string, string]) => ({
         price: parseFloat(price),
         volume: parseFloat(volume),
       }));
