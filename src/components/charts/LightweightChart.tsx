@@ -120,7 +120,7 @@ export default function LightweightChart({
 
         // В lightweight-charts v5 нужно использовать addSeries вместо addLineSeries
         const hasAddSeries = typeof chart?.addSeries === 'function';
-        const hasAddLineSeries = typeof chart?.addLineSeries === 'function';
+        const hasAddLineSeries = typeof (chart as any)?.addLineSeries === 'function';
 
         console.log('[Chart] Has addSeries?', hasAddSeries);
         console.log('[Chart] Has addLineSeries?', hasAddLineSeries);
