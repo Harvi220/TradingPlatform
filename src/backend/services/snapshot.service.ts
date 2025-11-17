@@ -88,14 +88,29 @@ export class SnapshotService {
         const data = await redis.zRangeByScore(key, from, to);
 
         if (data && data.length > 0) {
-          return data.map(item => JSON.parse(item));
+          // Parse and restore Date objects
+          return data.map(item => {
+            const parsed = JSON.parse(item);
+            return {
+              ...parsed,
+              timestamp: new Date(parsed.timestamp),
+            };
+          });
         }
       }
 
       // Try to read from query cache
       const queryKey = this.getQueryCacheKey(query);
       const cached = await redis.get(queryKey);
-      return cached ? JSON.parse(cached) : null;
+      if (cached) {
+        const parsed = JSON.parse(cached);
+        // Restore Date objects for each snapshot
+        return parsed.map((s: any) => ({
+          ...s,
+          timestamp: new Date(s.timestamp),
+        }));
+      }
+      return null;
     } catch (error) {
       console.warn('[SnapshotService] Redis read error:', error);
       return null;
