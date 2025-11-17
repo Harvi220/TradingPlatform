@@ -6,18 +6,20 @@
 
 import { createClient, RedisClientType } from 'redis';
 
+type RedisClient = ReturnType<typeof createClient>;
+
 // Global variable for Redis client
 declare global {
   // eslint-disable-next-line no-var
-  var redis: RedisClientType | undefined;
+  var redis: RedisClient | undefined;
 }
 
-let redisClient: RedisClientType | null = null;
+let redisClient: RedisClient | null = null;
 
 /**
  * Get or create Redis client instance
  */
-export async function getRedisClient(): Promise<RedisClientType> {
+export async function getRedisClient(): Promise<RedisClient> {
   if (redisClient && redisClient.isOpen) {
     return redisClient;
   }
