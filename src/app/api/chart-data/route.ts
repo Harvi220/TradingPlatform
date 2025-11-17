@@ -1,71 +1,75 @@
 /**
  * API Route для получения данных для графиков в формате Lightweight Charts
  * GET /api/chart-data?symbol=BTCUSDT&marketType=SPOT&depth=5&type=bid
+ *
+ * UPDATED: Теперь использует напрямую SnapshotService вместо внутреннего fetch
  */
 
 import { NextRequest, NextResponse } from 'next/server';
-
-// Используем существующий snapshotsStore из /api/snapshots
-// Но так как мы не можем напрямую импортировать из другого route,
-// создадим свой эндпоинт, который будет проксировать запросы к /api/snapshots
+import { snapshotService } from '@/backend/services/snapshot.service';
 
 export async function GET(request: NextRequest) {
   try {
     const { searchParams } = new URL(request.url);
     const symbol = searchParams.get('symbol');
-    const marketType = searchParams.get('marketType') || 'SPOT';
+    const marketType = (searchParams.get('marketType') || 'SPOT') as 'SPOT' | 'FUTURES';
     const depthParam = searchParams.get('depth');
-    const type = searchParams.get('type'); // 'bid' или 'ask'
+    const type = searchParams.get('type') as 'bid' | 'ask' | null;
+    const fromParam = searchParams.get('from');
+    const toParam = searchParams.get('to');
 
     console.log(`[API/chart-data] Request: symbol=${symbol}, marketType=${marketType}, depth=${depthParam}, type=${type}`);
 
-    if (!symbol || !depthParam || !type) {
+    if (!symbol || !depthParam) {
       return NextResponse.json(
         {
           error: 'MISSING_PARAMS',
-          message: 'Required parameters: symbol, depth, type (bid/ask)',
+          message: 'Required parameters: symbol, depth',
         },
         { status: 400 }
       );
     }
 
-    // Формируем URL для запроса к /api/snapshots
-    const snapshotsUrl = new URL('/api/snapshots', request.url);
-    snapshotsUrl.searchParams.set('symbol', symbol);
-    snapshotsUrl.searchParams.set('marketType', marketType);
-    snapshotsUrl.searchParams.set('depth', depthParam);
-    snapshotsUrl.searchParams.set('type', type);
+    const depth = parseFloat(depthParam);
 
-    console.log(`[API/chart-data] Fetching from: ${snapshotsUrl.toString()}`);
+    // Default: last hour
+    const to = toParam ? new Date(parseInt(toParam)) : new Date();
+    const from = fromParam ? new Date(parseInt(fromParam)) : new Date(to.getTime() - 60 * 60 * 1000);
 
-    // Делаем внутренний запрос к /api/snapshots
-    const snapshotsResponse = await fetch(snapshotsUrl.toString());
-
-    if (!snapshotsResponse.ok) {
-      console.error(`[API/chart-data] Snapshots request failed:`, snapshotsResponse.status);
-      throw new Error('Failed to fetch snapshots');
-    }
-
-    const snapshotsData = await snapshotsResponse.json();
-    console.log(`[API/chart-data] Snapshots data:`, {
-      count: snapshotsData.data?.length || 0,
-      sample: snapshotsData.data?.[0],
+    // Read from database via SnapshotService (with caching)
+    const snapshots = await snapshotService.read({
+      symbol,
+      marketType,
+      depth,
+      type: type || undefined,
+      from,
+      to,
+      limit: 3600, // Max 1 hour of minute data
     });
 
-    // Преобразуем данные в формат Lightweight Charts
-    // Формат: { time: number (в секундах), value: number }[]
-    const chartData = snapshotsData.data.map((item: any) => ({
-      time: Math.floor(item.timestamp / 1000), // Конвертируем из миллисекунд в секунды
-      value: item.value,
-    }));
+    console.log(`[API/chart-data] Found ${snapshots.length} snapshots`);
+
+    // Transform to Lightweight Charts format
+    // Format: { time: number (in seconds), value: number }[]
+    const chartData = snapshots.map((s: any) => {
+      const timestamp = s.timestamp.getTime ? s.timestamp.getTime() : s.timestamp;
+      const value = type === 'bid' ? s.bidVolumeUsd
+        : type === 'ask' ? s.askVolumeUsd
+        : (s.bidVolumeUsd + s.askVolumeUsd) / 2;
+
+      return {
+        time: Math.floor(timestamp / 1000), // Convert to seconds
+        value,
+      };
+    });
 
     console.log(`[API/chart-data] Returning ${chartData.length} chart points`);
 
     return NextResponse.json({
       symbol,
       marketType,
-      depth: parseFloat(depthParam),
-      type,
+      depth,
+      type: type || 'both',
       data: chartData,
       count: chartData.length,
       timestamp: Date.now(),

@@ -4,6 +4,11 @@ const nextConfig: NextConfig = {
   // Настройки для production build
   output: 'standalone',
 
+  // Enable instrumentation hook for server-side initialization
+  experimental: {
+    instrumentationHook: true,
+  },
+
   async headers() {
     const allowedOrigins = process.env.ALLOWED_ORIGINS?.split(',') || ['http://localhost:3000'];
 

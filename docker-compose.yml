@@ -48,11 +48,12 @@ services:
       timeout: 5s
       retries: 5
 
-  # Redis (для будущего rate limiting и кэширования)
+  # Redis (для кэширования snapshots)
   redis:
     image: redis:7-alpine
     container_name: trading-platform-redis
     restart: unless-stopped
+    command: redis-server --maxmemory 256mb --maxmemory-policy allkeys-lru
     volumes:
       - redis_data:/data
     # Порты не пробрасываем наружу - доступ только внутри Docker сети
