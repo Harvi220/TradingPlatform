@@ -25,9 +25,9 @@ services:
     networks:
       - trading-network
 
-  # PostgreSQL database
+  # PostgreSQL + TimescaleDB database
   db:
-    image: postgres:16-alpine
+    image: timescale/timescaledb:latest-pg16
     container_name: trading-platform-db
     restart: unless-stopped
     environment:
@@ -36,6 +36,7 @@ services:
       POSTGRES_DB: tradingdb
     volumes:
       - postgres_data:/var/lib/postgresql/data
+      - ./scripts/init-timescaledb.sql:/docker-entrypoint-initdb.d/init.sql:ro
     # Порты не пробрасываем наружу - доступ только внутри Docker сети
     # ports:
     #   - "5432:5432"
