@@ -1601,7 +1601,7 @@ export function RealTimeChart({ symbol, marketType }: RealTimeChartProps) {
 
 ## 13. ОЦЕНКА ВРЕМЕНИ
 
-### С Claude Code + WebSocket
+### С использованием WebSocket
 
 | Фаза | Оптимистично | Реалистично | Пессимистично |
 |------|--------------|-------------|---------------|
@@ -1650,7 +1650,6 @@ export function RealTimeChart({ symbol, marketType }: RealTimeChartProps) {
 
 ---
 
-**Документ создан:** Claude Code
 **Для проекта:** Trading Platform
 **Версия:** 2.1 FINAL (с WebSocket)
 **Дата:** 17 ноября 2025

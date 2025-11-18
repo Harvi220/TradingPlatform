@@ -39,6 +39,13 @@ export async function GET(request: NextRequest) {
     // Получаем текущий order book
     const orderBook = service.getOrderBook();
 
+    // ОТЛАДКА: Логируем количество ордеров и ценовой диапазон
+    const lowestBid = orderBook.bids[orderBook.bids.length - 1]?.price || 0;
+    const highestAsk = orderBook.asks[orderBook.asks.length - 1]?.price || 0;
+    const bidRange = orderBook.bids[0] ? ((orderBook.bids[0].price - lowestBid) / orderBook.bids[0].price * 100).toFixed(2) : 0;
+    const askRange = orderBook.asks[0] ? ((highestAsk - orderBook.asks[0].price) / orderBook.asks[0].price * 100).toFixed(2) : 0;
+    console.log(`OrderBook for ${symbol} FUTURES: ${orderBook.bids.length} bids (range: ${bidRange}%), ${orderBook.asks.length} asks (range: ${askRange}%)`);
+
     // Проверяем, есть ли данные
     if (orderBook.bids.length === 0 || orderBook.asks.length === 0) {
       return NextResponse.json(

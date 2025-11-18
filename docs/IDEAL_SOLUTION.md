@@ -1381,6 +1381,5 @@ DB connection lost → Retry with exponential backoff
 
 ---
 
-**Документ подготовлен:** Claude Code
 **Для проекта:** Trading Platform
 **Дата:** 17 ноября 2025

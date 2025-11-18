@@ -223,7 +223,6 @@ docker-compose logs -f app
 ## 👥 Авторы
 
 Trading Platform Development Team
-Powered by Claude Code
 
 ## 📄 Лицензия
 

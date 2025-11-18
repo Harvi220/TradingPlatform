@@ -14,6 +14,7 @@ export class BinanceWebSocketService {
   private reconnectAttempts = 0;
   private reconnectTimeout: NodeJS.Timeout | null = null;
   private pingInterval: NodeJS.Timeout | null = null;
+  private hasLoggedFirstMessage = false;
 
   constructor(
     private symbol: TradingSymbol,
@@ -92,10 +93,15 @@ export class BinanceWebSocketService {
       ? BINANCE_WS_URLS.SPOT
       : BINANCE_WS_URLS.FUTURES;
 
-    // ИСПРАВЛЕНИЕ: Используем медленную скорость (1 раз в секунду вместо 10)
-    const stream = `${this.symbol.toLowerCase()}@depth@${UPDATE_SPEED.SLOW}`;
+    // ИСПРАВЛЕНИЕ: Для FUTURES используем @100ms (более быстрые обновления)
+    // Для SPOT используем @1000ms (медленная скорость)
+    const updateSpeed = this.marketType === 'FUTURES' ? UPDATE_SPEED.FAST : UPDATE_SPEED.SLOW;
+    const stream = `${this.symbol.toLowerCase()}@depth@${updateSpeed}`;
 
-    return `${baseUrl}/${stream}`;
+    const url = `${baseUrl}/${stream}`;
+    console.log(`[WS URL] ${this.symbol} ${this.marketType}: ${url}`);
+
+    return url;
   }
 
   /**
@@ -115,10 +121,16 @@ export class BinanceWebSocketService {
     try {
       const message = JSON.parse(data.toString());
 
+      // ОТЛАДКА: Логируем первое сообщение для каждого символа
+      if (!this.hasLoggedFirstMessage) {
+        console.log(`[WS ${this.symbol} ${this.marketType}] First message:`, JSON.stringify(message).substring(0, 200));
+        this.hasLoggedFirstMessage = true;
+      }
+
       if (isValidDepthUpdate(message)) {
         this.onMessage(message);
       } else {
-        console.warn('Invalid depth update format:', message);
+        console.warn(`[WS ${this.symbol} ${this.marketType}] Invalid depth update format:`, JSON.stringify(message).substring(0, 200));
       }
     } catch (error) {
       console.error('Error parsing WebSocket message:', error);
