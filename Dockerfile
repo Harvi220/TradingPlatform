@@ -3,7 +3,7 @@ FROM node:20-alpine AS base
 
 # Установка dependencies
 FROM base AS deps
-RUN apk add --no-cache libc6-compat
+RUN apk add --no-cache libc6-compat openssl1.1-compat
 WORKDIR /app
 
 # Копируем package.json и package-lock.json
@@ -12,6 +12,7 @@ RUN npm ci
 
 # Build приложения
 FROM base AS builder
+RUN apk add --no-cache openssl1.1-compat libc6-compat
 WORKDIR /app
 COPY --from=deps /app/node_modules ./node_modules
 COPY . .
@@ -28,7 +29,7 @@ FROM base AS runner
 WORKDIR /app
 
 # Установка OpenSSL для Prisma
-RUN apk add --no-cache openssl libc6-compat
+RUN apk add --no-cache openssl1.1-compat libc6-compat
 
 ENV NODE_ENV=production
 ENV NEXT_TELEMETRY_DISABLED=1
