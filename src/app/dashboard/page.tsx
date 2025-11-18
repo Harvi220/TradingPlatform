@@ -23,7 +23,7 @@ export default function DashboardPage() {
       <div className="p-8">
         <div className="max-w-7xl mx-auto">
           <PageHeader
-            title="Trading Platform Dashboard"
+            title="Dashboard"
             description="Мониторинг стакана ордеров Binance в реальном времени"
           />
 

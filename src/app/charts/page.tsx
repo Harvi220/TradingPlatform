@@ -54,9 +54,10 @@ export default function ChartsPage() {
 
   // Автоматический запуск сбора данных для графиков bid/ask с регулярным опросом
   useEffect(() => {
-    const endpoint = marketType === "spot"
-      ? `/api/binance/spot?symbol=${symbol}`
-      : `/api/binance/futures?symbol=${symbol}`;
+    const endpoint =
+      marketType === "spot"
+        ? `/api/binance/spot?symbol=${symbol}`
+        : `/api/binance/futures?symbol=${symbol}`;
 
     const pollDataCollection = async () => {
       try {
@@ -67,7 +68,7 @@ export default function ChartsPage() {
           console.warn(`[Charts] Data collection error:`, response.status);
         }
       } catch (error) {
-        console.error('[Charts] Error polling data collection:', error);
+        console.error("[Charts] Error polling data collection:", error);
       }
     };
 
@@ -75,7 +76,10 @@ export default function ChartsPage() {
     pollDataCollection();
 
     // Опрашиваем каждую секунду для сохранения снэпшотов
-    const intervalId = setInterval(pollDataCollection, DATA_COLLECTION_INTERVAL);
+    const intervalId = setInterval(
+      pollDataCollection,
+      DATA_COLLECTION_INTERVAL
+    );
 
     return () => {
       clearInterval(intervalId);
@@ -175,9 +179,7 @@ export default function ChartsPage() {
           <div className="mb-4">
             <div className="flex items-center justify-between mb-4">
               <div>
-                <h1 className="text-3xl font-bold text-gray-900">
-                  Trading Charts
-                </h1>
+                <h1 className="text-3xl font-bold text-gray-900">Charts</h1>
               </div>
 
               {/* Фильтры справа */}
