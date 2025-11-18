@@ -6,52 +6,11 @@
  */
 
 import { useState, useEffect } from "react";
-
-interface OrderBookData {
-  symbol: string;
-  timestamp: number;
-  midPrice: number | null;
-  spread: number | null;
-  bestBid: { price: number; volume: number } | null;
-  bestAsk: { price: number; volume: number } | null;
-  bids: Array<{ price: number; volume: number }>;
-  asks: Array<{ price: number; volume: number }>;
-  depthVolumes: Array<{
-    depth: number;
-    bidVolume: number;
-    askVolume: number;
-    totalBidValue: number;
-    totalAskValue: number;
-  }>;
-  diffs: Array<{
-    depth: number;
-    diff: number;
-    bidVolume: number;
-    askVolume: number;
-    percentage: number;
-  }>;
-  depthDetails: Array<{
-    depth: number;
-    bidRange: { from: number; to: number };
-    askRange: { from: number; to: number };
-    bidOrderCount: number;
-    askOrderCount: number;
-    bidVolume: number;
-    askVolume: number;
-    bidMinPrice: number | null;
-    bidMaxPrice: number | null;
-    askMinPrice: number | null;
-    askMaxPrice: number | null;
-  }>;
-  orderBookLimits: {
-    lowestBidPrice: number | null;
-    highestBidPrice: number | null;
-    lowestAskPrice: number | null;
-    highestAskPrice: number | null;
-    totalBidsCount: number;
-    totalAsksCount: number;
-  };
-}
+import { OrderBookData } from "@/shared/types/orderbook.types";
+import { REST_REFRESH_INTERVAL } from "@/shared/constants/intervals";
+import { EXTENDED_MARKET_DEPTHS } from "@/shared/constants/trading";
+import { getBaseCurrency, formatUSD, formatPrice, formatVolume, formatTime } from "@/shared/utils";
+import { useCountdown } from "@/hooks/useCountdown";
 
 interface OrderBookRestTableProps {
   marketType: "spot" | "futures";
@@ -66,31 +25,9 @@ export default function OrderBookRestTable({
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [lastUpdate, setLastUpdate] = useState<number>(0);
-  const [nextUpdate, setNextUpdate] = useState<number>(60);
-
-  // Извлекаем базовую валюту из символа (например, BTC из BTCUSDT)
-  const getBaseCurrency = (symbol: string): string => {
-    const quoteCurrencies = ['USDT', 'USDC', 'BUSD', 'USD', 'BTC', 'ETH', 'BNB'];
-    for (const quote of quoteCurrencies) {
-      if (symbol.endsWith(quote)) {
-        return symbol.slice(0, -quote.length);
-      }
-    }
-    return symbol;
-  };
 
   const baseCurrency = getBaseCurrency(symbol);
-
-  // Форматирование USD в миллионах или тысячах
-  const formatUSD = (value: number): string => {
-    if (value >= 1000000) {
-      return `$${(value / 1000000).toFixed(2)}M`;
-    } else if (value >= 1000) {
-      return `$${(value / 1000).toFixed(2)}K`;
-    } else {
-      return `$${value.toFixed(2)}`;
-    }
-  };
+  const nextUpdate = useCountdown(lastUpdate, 60);
 
   // Функция для получения данных напрямую от Binance REST API
   const fetchBinanceData = async () => {
@@ -127,7 +64,7 @@ export default function OrderBookRestTable({
       const spread = bestBid && bestAsk ? bestAsk.price - bestBid.price : null;
 
       // Вычисляем объемы на различных глубинах
-      const depths = [1.5, 3, 5, 8, 10, 15, 20, 30];
+      const depths = [...EXTENDED_MARKET_DEPTHS];
       const depthVolumes: any[] = [];
       const depthDetails: any[] = [];
 
@@ -239,7 +176,6 @@ export default function OrderBookRestTable({
       });
 
       setLastUpdate(Date.now());
-      setNextUpdate(60);
       setError(null);
       setLoading(false);
     } catch (err) {
@@ -257,25 +193,14 @@ export default function OrderBookRestTable({
     // Первоначальная загрузка
     fetchBinanceData();
 
-    // Периодическое обновление каждую минуту (60000 ms)
-    const interval = setInterval(fetchBinanceData, 60000);
+    // Периодическое обновление каждую минуту
+    const interval = setInterval(fetchBinanceData, REST_REFRESH_INTERVAL);
 
     // Cleanup: очищаем interval при размонтировании или смене зависимостей
     return () => {
       clearInterval(interval);
     };
   }, [marketType, symbol]);
-
-  // Обновляем счетчик до следующего обновления
-  useEffect(() => {
-    const timer = setInterval(() => {
-      const timeSinceUpdate = Math.floor((Date.now() - lastUpdate) / 1000);
-      const remaining = 60 - timeSinceUpdate;
-      setNextUpdate(remaining > 0 ? remaining : 0);
-    }, 1000);
-
-    return () => clearInterval(timer);
-  }, [lastUpdate]);
 
   if (loading && !data) {
     return (
@@ -307,7 +232,7 @@ export default function OrderBookRestTable({
               {data.symbol} - REST API
             </h2>
             <div className="text-xs text-gray-600 mt-1">
-              Последнее обновление: {new Date(data.timestamp).toLocaleTimeString('ru-RU')}
+              Последнее обновление: {formatTime(data.timestamp)}
               <span className="ml-2">({60 - nextUpdate}с назад)</span>
             </div>
             <div className="text-xs text-orange-600 font-semibold mt-1">
@@ -335,25 +260,25 @@ export default function OrderBookRestTable({
           <div>
             <div className="text-gray-600">Mid Price</div>
             <div className="font-mono text-lg">
-              {data.midPrice ? `$${data.midPrice.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 8 })}` : "N/A"}
+              {data.midPrice ? `$${formatPrice(data.midPrice)}` : "N/A"}
             </div>
           </div>
           <div>
             <div className="text-gray-600">Spread</div>
             <div className="font-mono text-lg">
-              {data.spread ? `$${data.spread.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 8 })}` : "N/A"}
+              {data.spread ? `$${formatPrice(data.spread)}` : "N/A"}
             </div>
           </div>
           <div>
             <div className="text-gray-600">Best Bid</div>
             <div className="font-mono text-lg">
-              {data.bestBid ? `$${data.bestBid.price.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 8 })}` : "N/A"}
+              {data.bestBid ? `$${formatPrice(data.bestBid.price)}` : "N/A"}
             </div>
           </div>
           <div>
             <div className="text-gray-600">Best Ask</div>
             <div className="font-mono text-lg">
-              {data.bestAsk ? `$${data.bestAsk.price.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 8 })}` : "N/A"}
+              {data.bestAsk ? `$${formatPrice(data.bestAsk.price)}` : "N/A"}
             </div>
           </div>
         </div>
@@ -411,13 +336,13 @@ export default function OrderBookRestTable({
                     ) : ( */}
                       <>
                         <td className="px-4 py-2 border text-right font-mono text-green-700">
-                          {dv.bidVolume.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 4 })} {baseCurrency}
+                          {formatVolume(dv.bidVolume)} {baseCurrency}
                         </td>
                         <td className="px-4 py-2 border text-right font-mono text-green-700 font-bold">
                           {formatUSD(dv.totalBidValue)}
                         </td>
                         <td className="px-4 py-2 border text-right font-mono text-red-700">
-                          {dv.askVolume.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 4 })} {baseCurrency}
+                          {formatVolume(dv.askVolume)} {baseCurrency}
                         </td>
                         <td className="px-4 py-2 border text-right font-mono text-red-700 font-bold">
                           {formatUSD(dv.totalAskValue)}
@@ -428,7 +353,7 @@ export default function OrderBookRestTable({
                           }`}
                         >
                           {diff.diff > 0 ? "+" : ""}
-                          {diff.diff.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 4 })} {baseCurrency}
+                          {formatVolume(diff.diff)} {baseCurrency}
                         </td>
                         <td
                           className={`px-4 py-2 border text-right font-mono ${
@@ -452,62 +377,65 @@ export default function OrderBookRestTable({
       </div>
 
       {/* Информация о пределах стакана */}
-      <div className="bg-yellow-50 p-4 rounded-lg">
-        <h3 className="text-lg font-semibold mb-3">Информация о полученных данных от Binance</h3>
-        <div className="grid grid-cols-2 md:grid-cols-3 gap-4 text-sm">
-          <div>
-            <div className="text-gray-600">Всего BID ордеров</div>
-            <div className="font-mono text-lg text-green-700">{data.orderBookLimits.totalBidsCount}</div>
-          </div>
-          <div>
-            <div className="text-gray-600">Всего ASK ордеров</div>
-            <div className="font-mono text-lg text-red-700">{data.orderBookLimits.totalAsksCount}</div>
-          </div>
-          <div>
-            <div className="text-gray-600">BID: Самая низкая цена</div>
-            <div className="font-mono text-sm text-green-700">
-              {data.orderBookLimits.lowestBidPrice ? `$${data.orderBookLimits.lowestBidPrice.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` : 'N/A'}
+      {data.orderBookLimits && (
+        <div className="bg-yellow-50 p-4 rounded-lg">
+          <h3 className="text-lg font-semibold mb-3">Информация о полученных данных от Binance</h3>
+          <div className="grid grid-cols-2 md:grid-cols-3 gap-4 text-sm">
+            <div>
+              <div className="text-gray-600">Всего BID ордеров</div>
+              <div className="font-mono text-lg text-green-700">{data.orderBookLimits.totalBidsCount}</div>
             </div>
-          </div>
-          <div>
-            <div className="text-gray-600">BID: Самая высокая цена</div>
-            <div className="font-mono text-sm text-green-700">
-              {data.orderBookLimits.highestBidPrice ? `$${data.orderBookLimits.highestBidPrice.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` : 'N/A'}
+            <div>
+              <div className="text-gray-600">Всего ASK ордеров</div>
+              <div className="font-mono text-lg text-red-700">{data.orderBookLimits.totalAsksCount}</div>
             </div>
-          </div>
-          <div>
-            <div className="text-gray-600">ASK: Самая низкая цена</div>
-            <div className="font-mono text-sm text-red-700">
-              {data.orderBookLimits.lowestAskPrice ? `$${data.orderBookLimits.lowestAskPrice.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` : 'N/A'}
+            <div>
+              <div className="text-gray-600">BID: Самая низкая цена</div>
+              <div className="font-mono text-sm text-green-700">
+                {data.orderBookLimits.lowestBidPrice ? `$${data.orderBookLimits.lowestBidPrice.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` : 'N/A'}
+              </div>
             </div>
-          </div>
-          <div>
-            <div className="text-gray-600">ASK: Самая высокая цена</div>
-            <div className="font-mono text-sm text-red-700">
-              {data.orderBookLimits.highestAskPrice ? `$${data.orderBookLimits.highestAskPrice.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` : 'N/A'}
+            <div>
+              <div className="text-gray-600">BID: Самая высокая цена</div>
+              <div className="font-mono text-sm text-green-700">
+                {data.orderBookLimits.highestBidPrice ? `$${data.orderBookLimits.highestBidPrice.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` : 'N/A'}
+              </div>
+            </div>
+            <div>
+              <div className="text-gray-600">ASK: Самая низкая цена</div>
+              <div className="font-mono text-sm text-red-700">
+                {data.orderBookLimits.lowestAskPrice ? `$${data.orderBookLimits.lowestAskPrice.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` : 'N/A'}
+              </div>
+            </div>
+            <div>
+              <div className="text-gray-600">ASK: Самая высокая цена</div>
+              <div className="font-mono text-sm text-red-700">
+                {data.orderBookLimits.highestAskPrice ? `$${data.orderBookLimits.highestAskPrice.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` : 'N/A'}
+              </div>
             </div>
           </div>
         </div>
-      </div>
+      )}
 
       {/* Детальная информация по глубинам */}
-      <div>
-        <h3 className="text-xl font-semibold mb-3">Детальная информация по глубинам</h3>
-        <div className="overflow-x-auto">
-          <table className="min-w-full bg-white border border-gray-300 text-sm">
-            <thead className="bg-gray-100">
-              <tr>
-                <th className="px-2 py-2 border">Глубина</th>
-                <th className="px-2 py-2 border text-green-700">BID диапазон (расчетный)</th>
-                <th className="px-2 py-2 border text-green-700">BID факт. цены</th>
-                <th className="px-2 py-2 border text-green-700">Кол-во</th>
-                <th className="px-2 py-2 border text-red-700">ASK диапазон (расчетный)</th>
-                <th className="px-2 py-2 border text-red-700">ASK факт. цены</th>
-                <th className="px-2 py-2 border text-red-700">Кол-во</th>
-              </tr>
-            </thead>
-            <tbody>
-              {data.depthDetails.map((detail, index) => {
+      {data.depthDetails && (
+        <div>
+          <h3 className="text-xl font-semibold mb-3">Детальная информация по глубинам</h3>
+          <div className="overflow-x-auto">
+            <table className="min-w-full bg-white border border-gray-300 text-sm">
+              <thead className="bg-gray-100">
+                <tr>
+                  <th className="px-2 py-2 border">Глубина</th>
+                  <th className="px-2 py-2 border text-green-700">BID диапазон (расчетный)</th>
+                  <th className="px-2 py-2 border text-green-700">BID факт. цены</th>
+                  <th className="px-2 py-2 border text-green-700">Кол-во</th>
+                  <th className="px-2 py-2 border text-red-700">ASK диапазон (расчетный)</th>
+                  <th className="px-2 py-2 border text-red-700">ASK факт. цены</th>
+                  <th className="px-2 py-2 border text-red-700">Кол-во</th>
+                </tr>
+              </thead>
+              <tbody>
+                {data.depthDetails.map((detail, index) => {
                 // ЗАКОММЕНТИРОВАНО: Проверка на недостаточность данных
                 // Проверка на недостаточность данных:
                 // 1. Оба количества ордеров равны 0
@@ -562,10 +490,11 @@ export default function OrderBookRestTable({
                   </tr>
                 );
               })}
-            </tbody>
-          </table>
+              </tbody>
+            </table>
+          </div>
         </div>
-      </div>
+      )}
 
       {/* Топ ордеров */}
       <div>

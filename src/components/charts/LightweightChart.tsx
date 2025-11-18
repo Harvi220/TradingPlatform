@@ -6,35 +6,16 @@
  */
 
 import { useEffect, useRef, useState } from "react";
+import { INDICATOR_COLORS } from "@/shared/constants/chart-colors";
+import { MARKET_DEPTHS } from "@/shared/constants/trading";
+import { DATA_COLLECTION_INTERVAL, CHART_INIT_DELAY, CHART_DATA_LOAD_DELAY, CHART_UPDATE_INTERVAL } from "@/shared/constants/intervals";
+import { EnabledIndicators } from "@/shared/types/chart.types";
 
 interface LightweightChartProps {
   symbol: string;
   marketType: "spot" | "futures";
-  enabledIndicators: {
-    bid: { [key: string]: boolean };
-    ask: { [key: string]: boolean };
-  };
+  enabledIndicators: EnabledIndicators;
 }
-
-// Цветовая схема для индикаторов
-const INDICATOR_COLORS = {
-  bid: {
-    "1.5": "#90EE90",
-    "3": "#00C853",
-    "5": "#00897B",
-    "8": "#00ACC1",
-    "15": "#1976D2",
-    "30": "#0D47A1",
-  },
-  ask: {
-    "1.5": "#FFCDD2",
-    "3": "#EF5350",
-    "5": "#D32F2F",
-    "8": "#FF6F00",
-    "15": "#F57C00",
-    "30": "#E65100",
-  },
-};
 
 export default function LightweightChart({
   symbol,
@@ -156,7 +137,7 @@ export default function LightweightChart({
     // Небольшая задержка для гарантии что DOM готов
     const initTimeout = setTimeout(() => {
       initChart();
-    }, 50);
+    }, CHART_INIT_DELAY);
 
     // Cleanup
     return () => {
@@ -205,7 +186,7 @@ export default function LightweightChart({
     pollDataCollection();
 
     // Опрашиваем каждую секунду для сохранения снэпшотов
-    const intervalId = setInterval(pollDataCollection, 1000);
+    const intervalId = setInterval(pollDataCollection, DATA_COLLECTION_INTERVAL);
 
     return () => {
       clearInterval(intervalId);
@@ -220,7 +201,7 @@ export default function LightweightChart({
     }
 
     const chart = chartInstanceRef.current;
-    const depths = ["1.5", "3", "5", "8", "15", "30"];
+    const depths = MARKET_DEPTHS.map(String);
     let intervalId: NodeJS.Timeout;
     let timeoutId: NodeJS.Timeout;
 
@@ -369,8 +350,8 @@ export default function LightweightChart({
       updateChart(true);
 
       // Обновление каждую секунду
-      intervalId = setInterval(() => updateChart(false), 1000);
-    }, 100);
+      intervalId = setInterval(() => updateChart(false), CHART_UPDATE_INTERVAL);
+    }, CHART_DATA_LOAD_DELAY);
 
     return () => {
       if (timeoutId) {

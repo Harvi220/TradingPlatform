@@ -9,17 +9,19 @@
 
 export async function register() {
   // Only run on server-side
-  if (process.env.NEXT_RUNTIME === 'nodejs') {
-    console.log('[Instrumentation] Initializing server-side services...');
+  if (process.env.NEXT_RUNTIME === "nodejs") {
+    console.log("[Instrumentation] Initializing server-side services...");
 
     try {
       // Import and start the Binance data collector
-      const { startDataCollection } = await import('./backend/init/startCollector');
+      const { startDataCollection } = await import(
+        "./backend/init/startCollector"
+      );
       startDataCollection();
 
-      console.log('[Instrumentation] ✓ All services initialized successfully');
+      console.log("[Instrumentation] All services initialized successfully");
     } catch (error) {
-      console.error('[Instrumentation] ✗ Failed to initialize services:', error);
+      console.error("[Instrumentation] Failed to initialize services:", error);
     }
   }
 }

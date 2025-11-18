@@ -4,35 +4,16 @@
  * Панель управления индикаторами BID/ASK
  */
 
+import { MARKET_DEPTHS } from '@/shared/constants/trading';
+import { INDICATOR_COLORS } from '@/shared/constants/chart-colors';
+import { EnabledIndicators } from '@/shared/types/chart.types';
+
 interface IndicatorsPanelProps {
-  enabledIndicators: {
-    bid: { [key: string]: boolean };
-    ask: { [key: string]: boolean };
-  };
+  enabledIndicators: EnabledIndicators;
   onToggle: (type: "bid" | "ask", depth: string) => void;
 }
 
-const DEPTHS = ["1.5", "3", "5", "8", "15", "30"];
-
-// Цветовые индикаторы для визуализации
-const INDICATOR_COLORS = {
-  bid: {
-    "1.5": "#90EE90",
-    "3": "#00C853",
-    "5": "#00897B",
-    "8": "#00ACC1",
-    "15": "#1976D2",
-    "30": "#0D47A1",
-  },
-  ask: {
-    "1.5": "#FFCDD2",
-    "3": "#EF5350",
-    "5": "#D32F2F",
-    "8": "#FF6F00",
-    "15": "#F57C00",
-    "30": "#E65100",
-  },
-};
+const DEPTHS = MARKET_DEPTHS.map(String);
 
 export default function IndicatorsPanel({
   enabledIndicators,

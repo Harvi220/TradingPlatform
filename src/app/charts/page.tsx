@@ -8,13 +8,15 @@ import { useEffect, useRef, useState } from "react";
 import Navigation from "@/components/layout/Navigation";
 import LightweightChart from "@/components/charts/LightweightChart";
 import IndicatorsPanel from "@/components/charts/IndicatorsPanel";
+import { TRADING_SYMBOLS } from "@/shared/constants/trading";
+import { DATA_COLLECTION_INTERVAL } from "@/shared/constants/intervals";
 
 export default function ChartsPage() {
-  const [symbol, setSymbol] = useState("BTCUSDT");
+  const [symbol, setSymbol] = useState<string>(TRADING_SYMBOLS[0]);
   const [marketType, setMarketType] = useState<"spot" | "futures">("spot");
   const chartContainerRef = useRef<HTMLDivElement>(null);
 
-  const symbols = ["BTCUSDT", "ETHUSDT", "BNBUSDT", "SOLUSDT", "XRPUSDT"];
+  const symbols: string[] = [...TRADING_SYMBOLS];
 
   // Состояние для индикаторов
   const [enabledIndicators, setEnabledIndicators] = useState<{
@@ -73,7 +75,7 @@ export default function ChartsPage() {
     pollDataCollection();
 
     // Опрашиваем каждую секунду для сохранения снэпшотов
-    const intervalId = setInterval(pollDataCollection, 1000);
+    const intervalId = setInterval(pollDataCollection, DATA_COLLECTION_INTERVAL);
 
     return () => {
       clearInterval(intervalId);
