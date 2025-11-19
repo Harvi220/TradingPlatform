@@ -25,6 +25,7 @@ export default function LightweightChart({
   const chartContainerRef = useRef<HTMLDivElement>(null);
   const chartInstanceRef = useRef<any>(null);
   const seriesMapRef = useRef<Map<string, any>>(new Map());
+  const lastTimestampRef = useRef<Map<string, number>>(new Map()); // Track last timestamp for each series
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [noData, setNoData] = useState(false);
@@ -214,6 +215,7 @@ export default function LightweightChart({
       }
     });
     seriesMapRef.current.clear();
+    lastTimestampRef.current.clear(); // Clear timestamp tracking
     setNoData(false);
 
     // Загрузка данных для одного индикатора
@@ -330,7 +332,27 @@ export default function LightweightChart({
               console.warn(`[Chart] Removed ${data.length - uniqueData.length} duplicate timestamps for ${seriesKey}`);
             }
 
-            series.setData(uniqueData);
+            // На первой загрузке используем setData для установки всех данных
+            if (isInitial) {
+              series.setData(uniqueData);
+              // Запоминаем последнюю временную метку
+              if (uniqueData.length > 0) {
+                lastTimestampRef.current.set(seriesKey, uniqueData[uniqueData.length - 1].time);
+              }
+            } else {
+              // При обновлении добавляем только новые точки
+              const lastTime = lastTimestampRef.current.get(seriesKey) || 0;
+              const newPoints = uniqueData.filter((point: any) => point.time > lastTime);
+
+              if (newPoints.length > 0) {
+                console.log(`[Chart] Adding ${newPoints.length} new points for ${seriesKey}`);
+                newPoints.forEach((point: any) => {
+                  series.update(point);
+                });
+                // Обновляем последнюю временную метку
+                lastTimestampRef.current.set(seriesKey, newPoints[newPoints.length - 1].time);
+              }
+            }
           } catch (e) {
             console.error(`[Chart] Failed to set data for ${seriesKey}:`, e);
           }

@@ -5,7 +5,7 @@
  * instead of WebSocket to avoid connection limits (max 5 WebSocket connections per IP)
  */
 
-import { snapshotService } from './snapshot.service';
+import { snapshotService } from "./snapshot.service";
 
 interface BinanceDepthResponse {
   lastUpdateId: number;
@@ -29,8 +29,8 @@ interface DepthVolumes {
 
 export class BinanceRestCollector {
   // API endpoints
-  private readonly SPOT_API = 'https://api.binance.com/api/v3/depth';
-  private readonly FUTURES_API = 'https://fapi.binance.com/fapi/v1/depth';
+  private readonly SPOT_API = "https://api.binance.com/api/v3/depth";
+  private readonly FUTURES_API = "https://fapi.binance.com/fapi/v1/depth";
 
   // Rate limiting
   private readonly REQUEST_DELAY_MS = 300; // 300ms between requests
@@ -62,17 +62,18 @@ export class BinanceRestCollector {
    */
   async fetchOrderBook(
     symbol: string,
-    marketType: 'SPOT' | 'FUTURES'
+    marketType: "SPOT" | "FUTURES"
   ): Promise<BinanceDepthResponse> {
-    const url = marketType === 'SPOT'
-      ? `${this.SPOT_API}?symbol=${symbol}&limit=${this.LIMIT}`
-      : `${this.FUTURES_API}?symbol=${symbol}&limit=${this.LIMIT}`;
+    const url =
+      marketType === "SPOT"
+        ? `${this.SPOT_API}?symbol=${symbol}&limit=${this.LIMIT}`
+        : `${this.FUTURES_API}?symbol=${symbol}&limit=${this.LIMIT}`;
 
     this.stats.totalRequests++;
 
     const response = await fetch(url, {
       headers: {
-        'Accept': 'application/json',
+        Accept: "application/json",
       },
     });
 
@@ -111,7 +112,7 @@ export class BinanceRestCollector {
     const bestAsk = orderBook.asks[0]?.price;
 
     if (!bestBid || !bestAsk) {
-      throw new Error('Empty order book');
+      throw new Error("Empty order book");
     }
 
     const result: DepthVolumes = {};
@@ -160,7 +161,7 @@ export class BinanceRestCollector {
   /**
    * Collect snapshots for one symbol
    */
-  async collectSymbol(symbol: string, marketType: 'SPOT' | 'FUTURES') {
+  async collectSymbol(symbol: string, marketType: "SPOT" | "FUTURES") {
     try {
       // 1. Fetch order book
       const data = await this.fetchOrderBook(symbol, marketType);
@@ -191,10 +192,9 @@ export class BinanceRestCollector {
         });
       }
 
-      console.log(`[Collector] ✓ ${symbol} ${marketType}`);
-
+      console.log(`[Collector] ${symbol} ${marketType}`);
     } catch (error) {
-      console.error(`[Collector] ✗ ${symbol} ${marketType}:`, error);
+      console.error(`[Collector] ${symbol} ${marketType}:`, error);
       // Continue with next symbol (don't break the whole cycle)
     }
   }
@@ -204,15 +204,17 @@ export class BinanceRestCollector {
    */
   async collectAllSnapshots() {
     const startTime = Date.now();
-    console.log(`[Collector] Starting collection for ${this.symbols.length} symbols...`);
+    console.log(
+      `[Collector] Starting collection for ${this.symbols.length} symbols...`
+    );
 
     for (const symbol of this.symbols) {
       // Collect SPOT
-      await this.collectSymbol(symbol, 'SPOT');
+      await this.collectSymbol(symbol, "SPOT");
       await this.sleep(this.REQUEST_DELAY_MS);
 
       // Collect FUTURES
-      await this.collectSymbol(symbol, 'FUTURES');
+      await this.collectSymbol(symbol, "FUTURES");
       await this.sleep(this.REQUEST_DELAY_MS);
     }
 
@@ -232,11 +234,11 @@ export class BinanceRestCollector {
    */
   start() {
     if (this.intervalId) {
-      console.log('[Collector] Already running');
+      console.log("[Collector] Already running");
       return;
     }
 
-    console.log('[Collector] Starting periodic collection...');
+    console.log("[Collector] Starting periodic collection...");
     console.log(`[Collector] Symbols: ${this.symbols.length}`);
     console.log(`[Collector] Interval: 60 seconds`);
 
@@ -256,7 +258,7 @@ export class BinanceRestCollector {
     if (this.intervalId) {
       clearInterval(this.intervalId);
       this.intervalId = null;
-      console.log('[Collector] Stopped');
+      console.log("[Collector] Stopped");
     }
   }
 
@@ -279,7 +281,7 @@ export class BinanceRestCollector {
    * Remove symbols from collection
    */
   removeSymbols(symbols: string[]) {
-    this.symbols = this.symbols.filter(s => !symbols.includes(s));
+    this.symbols = this.symbols.filter((s) => !symbols.includes(s));
     console.log(`[Collector] Symbols updated: ${this.symbols.length} total`);
   }
 
@@ -287,15 +289,15 @@ export class BinanceRestCollector {
    * Sleep helper
    */
   private sleep(ms: number): Promise<void> {
-    return new Promise(resolve => setTimeout(resolve, ms));
+    return new Promise((resolve) => setTimeout(resolve, ms));
   }
 }
 
 // Export singleton instance with default symbols
 export const binanceCollector = new BinanceRestCollector([
-  'BTCUSDT',
-  'ETHUSDT',
-  'BNBUSDT',
-  'SOLUSDT',
-  'ADAUSDT',
+  "BTCUSDT",
+  "ETHUSDT",
+  "BNBUSDT",
+  "SOLUSDT",
+  "ADAUSDT",
 ]);
